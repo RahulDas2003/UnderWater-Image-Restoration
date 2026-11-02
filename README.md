@@ -72,6 +72,52 @@ The enhancement pipeline consists of 6 modular stages designed to tackle specifi
 4.  **Dark Channel Dehazing**: Removes underwater haze/fog using the Dark Channel Prior (DCP) algorithm.
 5.  **Adaptive Sharpening**: Unsharp masking to enhance edge details.
 6.  **Gamma Correction**: Brightens shadow regions to reveal hidden details.
+7.  **🆕 Auto-Tune Per Frame**: Automatic coordinate-search optimization of parameters on a per-frame basis (see below).
+
+---
+
+## 🔧 Auto-Tune: Automatic Per-Frame Parameter Tuning
+
+When the **"Auto-tune parameters per frame"** checkbox is enabled, the tool automatically searches for the best combination of white-balance shifts, red boost, CLAHE clip limit, and dehaze omega for every frame.
+
+### How It Works
+
+| Aspect | Detail |
+| --- | --- |
+| **Algorithm** | Coordinate descent (one parameter at a time) starting from the current slider positions |
+| **Proxy resolution** | Each frame is downscaled to ~160 px wide before scoring, keeping the search fast |
+| **Iterations** | Up to 2 full passes over all 5 parameters; stops early if no improvement is found |
+| **Scoring** | A no-reference image quality metric (higher is better) |
+
+**Scoring function components:**
+
+| Component | Weight | Direction | Purpose |
+| --- | --- | --- | --- |
+| Luminance contrast (σ of L channel) | +1.0 | ↑ | Reward visible contrast |
+| Detail (mean \|Laplacian\| of L) | +0.5 | ↑ | Reward sharpness / fine texture |
+| Color cast (chrominance distance from neutral) | −1.5 | ↓ | Penalize residual green / blue cast |
+| Excess saturation (mean S above 130) | −0.8 | ↓ | Penalize garish over-saturation |
+| Clipping (fraction of pixels at 0 or 255) | −80.0 | ↓ | Penalize blown highlights / crushed shadows |
+
+### Usage
+
+1. Set the **sliders** to reasonable starting values — they serve as the *seed* for the search.
+2. Check **"Auto-tune parameters per frame"**.
+3. The labels next to each slider will show the auto-selected values with an `[auto]` tag.
+   - The sliders themselves are **not** moved; they continue to act as starting seeds.
+4. The tuned parameters are applied to:
+   - **Image preview** (Enhanced panel)
+   - **Saved images** (full-resolution re-tuning)
+   - **Video preview** (per-frame tuning during playback)
+   - **Exported video** (per-frame tuning during export)
+
+### Limitations
+
+- **Speed**: Auto-tuning adds ~20–60 ms per frame on a modern CPU. Video playback may drop to a lower frame-rate for high-resolution input.
+- **Search depth**: The coordinate search explores a coarse grid (step sizes of 4–10) with at most 2 iterations. It may miss the global optimum, particularly for images that need large parameter shifts away from the seed values.
+- **Proxy fidelity**: Scoring is performed on a 160 px-wide thumbnail. Fine spatial details that only appear at full resolution are not captured by the scorer.
+- **No temporal smoothing**: Each video frame is tuned independently, so parameters may fluctuate between consecutive frames. For very smooth results, manual parameter selection may be preferable.
+- **Score heuristic**: The quality metric is a hand-tuned weighted sum; it works well for typical underwater scenes but may not suit every image type.
 
 ---
 
@@ -136,7 +182,7 @@ Underwater-Image-Enhancement/
 ├── figs/                    # Result images for README
 │   ├── 8_img_.png
 │   └── enhanced_result.jpg
-├── underwater_enhance.py    # Python source code with PyQt5 GUI
+├── underwater_enhance.py    # Python source code with PyQt5 GUI + AutoTuner
 ├── underwater_enhance.cpp   # C++ source code with OpenCV HighGUI
 ├── README.md                # Project documentation
 └── requirements.txt         # Python dependencies
