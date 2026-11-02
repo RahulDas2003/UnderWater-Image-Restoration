@@ -1,2 +1,22 @@
 __pycache__/
 *.pyc
+
+# Image files
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.tiff
+*.gif
+*.webp
+
+# Video files
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wmv
+
+# Dataset and figure directories
+archive*/
+figs/
